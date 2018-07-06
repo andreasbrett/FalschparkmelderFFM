@@ -14,4 +14,4 @@ Vorfälle lassen sich schnell eingeben und versenden. Bereits versendete Vorfäl
 
 
 ## Datenbank
-Die Datenbank wird im SQLite Format gespeichert und lässt sich daher auch ohne FalschparkmelderFFM auslesen/bearbeiten. Hierfür empfehle ich den kostenlosen SQLite DB Browser (https://sqlitebrowser.org/).
+Die Datenbank wird im SQLite Format gespeichert und lässt sich daher auch ohne FalschparkmelderFFM auslesen/bearbeiten. Hierfür empfehle ich den kostenlosen [SQLite DB Browser](https://sqlitebrowser.org/).
