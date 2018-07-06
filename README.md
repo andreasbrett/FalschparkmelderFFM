@@ -9,7 +9,7 @@ Vorfälle lassen sich schnell eingeben und versenden. Bereits versendete Vorfäl
 ## Voraussetzungen
  - Windows 7/8/10
  - PowerShell
- - PowerShell Modul PSSQLite (https://github.com/RamblingCookieMonster/PSSQLite)
+ - PowerShell Modul [PSSQLite](https://github.com/RamblingCookieMonster/PSSQLite)
     - den Ordner **PSSQLite** in den Ordner **%homepath%\Documents\WindowsPowerShell\modules** kopieren
 
 
