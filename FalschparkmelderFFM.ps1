@@ -1,4 +1,4 @@
-﻿Import-Module PSSQLite
+Import-Module PSSQLite
 Add-Type -AssemblyName System.Web
 [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") | Out-Null
 [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
@@ -9,8 +9,8 @@ Add-Type -AssemblyName System.Web
 # ------------------------------------------------------------------------------------------------------------
 #  > MAIL SETTINGS
 # ------------------------------------------------------------------------------------------------------------
-    $mail_receiver = "owi.datenerfassung.amt32@stadt-frankfurt.de"
-    $mail_subject = "Anzeige: Verkehrsordnungswidrigkeit"
+    $Global:mail_receiver = "owi.datenerfassung.amt32@stadt-frankfurt.de"
+    $Global:mail_subject = "Anzeige: Verkehrsordnungswidrigkeit"
 
 
 
@@ -18,8 +18,8 @@ Add-Type -AssemblyName System.Web
 # ------------------------------------------------------------------------------------------------------------
 #  > DATABASE SETTINGS
 # ------------------------------------------------------------------------------------------------------------
-    $db = "$($PSScriptRoot)\$((Get-Item $PSCommandPath).BaseName).db"
-    $dbconn = $null
+    $Global:db = "$($PSScriptRoot)\$((Get-Item $PSCommandPath).BaseName).db"
+    $Global:dbconn = $null
 
 
 
@@ -280,8 +280,9 @@ Add-Type -AssemblyName System.Web
         # temporarily extract photo
         $tmpPhoto = New-TemporaryFile
         saveBlobToFile -blob $incident.photo -sFilePath $tmpPhoto.FullName
-        Rename-Item -Path $tmpPhoto -NewName "falschparker.jpg"
-        $tmpPhoto = "$($tmpPhoto.Directory.FullName)\falschparker.jpg"
+        $rnd = Get-Random -Minimum 10000 -Maximum 99999
+        Rename-Item -Path $tmpPhoto -NewName "falschparker_$($rnd).jpg"
+        $tmpPhoto = "$($tmpPhoto.Directory.FullName)\falschparker_$($rnd).jpg"
 
         # build body
         $body = "
@@ -303,20 +304,29 @@ Add-Type -AssemblyName System.Web
             Ein Beweisfoto aus dem Kennzeichen und Tatvorwurf erkennbar hervorgehen, befindet sich im Anhang
         "
 
-        # send mail
-        $utf8 = New-Object System.Text.utf8encoding
-        $cred = New-Object System.Management.Automation.Pscredential -Argumentlist ($user.mail_user), ($user.mail_password | ConvertTo-SecureString)
-        Send-MailMessage -Encoding $utf8 -From $user.mail_address -To $Global:mail_receiver -Subject $Global:mail_subject -Body $body -SmtpServer $user.mail_server -Port $user.mail_server_port -UseSsl -Credential $cred -Attachments $tmpPhoto
+        try {
+			# send mail
+			$utf8 = New-Object System.Text.utf8encoding
+			$cred = New-Object System.Management.Automation.Pscredential -Argumentlist ($user.mail_user), ($user.mail_password | ConvertTo-SecureString)
+            Send-MailMessage -ErrorAction Stop -Encoding $utf8 -From $user.mail_address -To $Global:mail_receiver -Subject $Global:mail_subject -Body $body -SmtpServer $user.mail_server -Port $user.mail_server_port -UseSsl -Credential $cred -Attachments $tmpPhoto
+		}
+		catch {
+			Write-Error $_.Exception.Message
+			return $false
+		}
+		
+		# delete temporary photo
+		Remove-Item $tmpPhoto
 
-        # delete temporary photo
-        Remove-Item $tmpPhoto
-
-        # update timestamp-sent
-        $qryMarkIncident = "UPDATE incidents SET timestamp_sent = @timestamp WHERE id = @id;"
-        Invoke-SqliteQuery -SQLiteConnection $Global:dbconn -Query $qryMarkIncident -SqlParameters @{
-            id = $incident.id
-            timestamp = (Get-Date)
-        }
+		# update timestamp-sent
+		$qryMarkIncident = "UPDATE incidents SET timestamp_sent = @timestamp WHERE id = @id;"
+		Invoke-SqliteQuery -SQLiteConnection $Global:dbconn -Query $qryMarkIncident -SqlParameters @{
+			id = $incident.id
+			timestamp = (Get-Date)
+		}
+		
+		return $true
+	
     }
 
 
@@ -913,12 +923,16 @@ Add-Type -AssemblyName System.Web
             # iterate over selected item(s)
             ForEach($item in $objListViewUnsent.SelectedItems) {
                 # send incidents
-                sendIncident -id $item.Name
+                $result = sendIncident -id $item.Name
             
                 # move list item from unsent to sent
-                $objListViewUnsent.Items.Remove($item)
-                $item.SubItems.Add("vor Kurzem")
-                $objListViewSent.Items.Add($item)
+                If ($result) {
+					$objListViewUnsent.Items.Remove($item)
+					$item.SubItems.Add("vor Kurzem")
+					$objListViewSent.Items.Add($item)
+				} Else {
+					[System.Windows.Forms.MessageBox]::Show("Email konnte nicht gesendet werden!","Mail Error", [System.Windows.Forms.MessageBoxButtons]::Ok)
+				}
             }
 
             # reset mouse cursor
